@@ -106,14 +106,6 @@ If prompted:
 
 Save connection for easier future access. 
 
-```
-python setup/dim_ncic_offense_codes.py
-```
-
-This script populates the dimensional table containing **NCIC offense code references** which are used to standardize offense classifications within the database.
-
-After both scripts have been executed successfully the **coldCounter SQLite database will be fully constructed and ready for analysis.**
-
 ---
 
 

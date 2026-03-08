@@ -67,10 +67,13 @@ These scripts allow users to produce summary outputs useful for:
 coldCounter/
 
 setup/
-    Python scripts used to generate and populate the database
+    Python script used to generate and populate the database
+    Excel file of NCIC offense codes
 
-reports/
-    Python scripts used to aggregate data from the database
+Beekeeper Portable Data Browser/
+    Data explorer tool
+
+
 
 README.md
 ```
@@ -83,15 +86,23 @@ The coldCounter database can be built locally using the provided setup scripts.
 
 ## Step 1 — Run the primary ETL process
 
-```
-python setup/build_coldCounter.py
-```
+Run the install_or_refresh_coldCounter.bat file
 
 This script performs the primary **Extract-Transform-Load (ETL)** process that constructs the base database and imports immigration enforcement data.
 
 ---
 
-## Step 2 — Populate the offense code dimension
+## Step 2 — Browse the Data Mart
+
+The build script will create coldCounter.db
+
+Open the Beekeeper Portable Data Browser folder and run Beekeeper-Studio-5.6.0-portable.exe
+
+If prompted: 
+    - Connection type = SQLite
+    - Database File - **Choose your coldCounter.db file**
+
+Save connection for easier future access. 
 
 ```
 python setup/dim_ncic_offense_codes.py

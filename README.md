@@ -85,10 +85,12 @@ README.md
 The coldCounter database can be built locally using the provided setup scripts.
 
 ## Step 1 — Run the primary ETL process
+The coldCounter.db file available for download in the repository is preloaded with all current data available as of the last repository update.
+**YOU MAY SKIP THIS STEP UNLESS YOU WANT TO GENERATE A NEW coldCounter.db FILE**
 
 Run the install_or_refresh_coldCounter.bat file
 
-This script performs the primary **Extract-Transform-Load (ETL)** process that constructs the base database and imports immigration enforcement data.
+This script performs the primary **Extract-Transform-Load (ETL)** process that constructs the base database and imports current data sets.
 
 ---
 
@@ -100,7 +102,7 @@ Open the Beekeeper Portable Data Browser folder and run Beekeeper-Studio-5.6.0-p
 
 If prompted: 
     - Connection type = SQLite
-    - Database File - **Choose your coldCounter.db file**
+    - Database File - *Choose your coldCounter.db file*
 
 Save connection for easier future access. 
 

@@ -49,7 +49,7 @@ coldCounter
 │├─ Beekeeper Portable Data Browser
 │  ├─ data exploration tool
 ├─ coldcounter.db
-│
+├─ install_or_refreash_coldCounter.bat
 └─ README.md
 ```
 
@@ -57,7 +57,7 @@ coldCounter
 
 # Data Exploration Tool
 
-This repository includes a distrobution of BeeKeeper Studio Portable. This project is in no way affiliated with Beekeeper Studio,
+This repository includes a distribution of BeeKeeper Studio Portable. This project is in no way affiliated with Beekeeper Studio,
 nor is any person presently involved with the development of this project, but they make a very easy to use SQLite browser that does
 not require you to install any additional software locally to your computer to use.   
 
@@ -71,10 +71,9 @@ Database File: *Choose your coldCounter.db file*
 
 Save your connection for later use.  
 *After running for first time, you can just open the coldCounter.db file directly* 
-
-
+  
 # Database Design
-
+  
 coldCounter uses a dimensional modeling approach designed for analytical queries.
 
 sample coldCounter.db provided in repository is updated as of most recent commit.
@@ -83,35 +82,44 @@ Primary tables include:
 
 ### Raw Tables
 
-arrests 
+arrests   
     - arrest data from the Deportation Data Project
 
-detainers
+detainers  
     - data from the Deportation Data Project pertaining to ICE contact with law enforcement.
 
-detention_stays
+detention_stays  
     - individual based reporting of detention data from the Deportation Data Project
 
-detention_stints
+detention_stints  
     - encounter based reporting of detention data from the Deportation Data Project
 
 ### Fact Tables
 
-fact_hold_rooms
-    - contains aggregate data regarding "hold room" usage
-    - Compares against ICE National Detention Standards for hold room usage. 
-        - “A detainee may not be held in a hold room for more than 12 hours.”
-        U.S. Immigration & Customs Enf’t, National Detention Standards 2025, § 2.5 Hold Rooms in Detention Facilities, at 32 (2025), https://www.ice.gov/doclib/detention-standards/2025/nds2025.pdf
-        - “Unaccompanied minors (under 18 years), persons over the age of 70 years, females with children, and family groups will not be placed in hold rooms, unless they have shown or threatened violent behavior, have criminal convictions involving violence, or have given staff articulable grounds to expect an escape attempt.”
-        U.S. Immigration & Customs Enf’t, National Detention Standards 2025, § 2.5 Hold Rooms in Detention Facilities, at 32 (2025), https://www.ice.gov/doclib/detention-standards/2025/nds2025.pdf
+fact_hold_rooms  
+    - contains aggregate data regarding "hold room" usage  
+    - Compares against ICE National Detention Standards for hold room usage.  
+    
+        “A detainee may not be held in a hold room for more than 12 hours.”  
+        U.S. Immigration & Customs Enf’t, National Detention Standards 2025,  
+        § 2.5 Hold Rooms in Detention Facilities, at 32 (2025),  
+        https://www.ice.gov/doclib/detention-standards/2025/nds2025.pdf  
+           
+        “Unaccompanied minors (under 18 years), persons over the age of 70 years, females with children,  
+        and family groups will not be placed in hold rooms, unless they have shown or threatened violent  
+        behavior, have criminal convictions involving violence, or have given staff articulable grounds   
+        to expect an escape attempt.”    
+        U.S. Immigration & Customs Enf’t, National Detention Standards 2025,  
+        § 2.5 Hold Rooms in Detention Facilities, at 32 (2025),  
+        https://www.ice.gov/doclib/detention-standards/2025/nds2025.pdf
 
-fact_detention_facilities
+fact_detention_facilities  
     - contains aggregate detention information from within the scope of the currently available data by facility
 
 
 ### Dimension Tables
 
-dim_ncic_offense_codes
+dim_ncic_offense_codes  
     - contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS
     
  

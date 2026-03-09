@@ -83,10 +83,13 @@ Primary tables include:
 
 arrests 
     - arrest data from the Deportation Data Project
+
 detainers
     - data from the Deportation Data Project pertaining to ICE contact with law enforcement.
+
 detention_stays
     - individual based reporting of detention data from the Deportation Data Project
+
 detention_stints
     - encounter based reporting of detention data from the Deportation Data Project
 
@@ -94,6 +97,7 @@ detention_stints
 
 fact_hold_rooms
     - contains aggregate data regarding "hold room" usage
+    
 fact_detention_facilities
     - contains aggregate detention information from within the scope of the currently available data by facility
 

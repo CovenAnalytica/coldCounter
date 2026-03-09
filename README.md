@@ -55,29 +55,38 @@ coldCounter
 
 ---
 
+# Data Exploration Tool
+
+This repository includes BeeKeeper Studio Portable. 
+
+Run /Beekeper Portable Data Browser/Beekeeper-Studio-5.6.0-portable.exe
+
+If prompted enter the following:
+Connection type: SQLite
+Database File: *Choose your coldCounter.db file*
+Save your connection for later use.
+*After running for first time, you can just open the coldCounter.db file directly* 
+
+
 # Database Design
 
 coldCounter uses a dimensional modeling approach designed for analytical queries.
 
+sample coldCounter.db provided in repository is updated as of most recent commit.
+
 Primary tables include:
 
-### Dimension Tables
+### Raw Tables
 
-dim_person  
-Basic demographic and classification attributes associated with a detention record.
-
-dim_facility  
-Information about detention facilities.
-
-dim_offense  
-Normalized offense classification codes derived from datasets published by deportationdata.org.
+arrests
+detainers
+detention_stays
+detention_stints
 
 ### Fact Tables
 
-fact_detention_events  
-Event level detention records linked to dimension tables through foreign keys.
-
-This structure allows analysts to efficiently perform queries across large enforcement datasets.
+fact_hold_rooms
+fact_detention_facilities
 
 ---
 

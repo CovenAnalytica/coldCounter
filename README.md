@@ -57,7 +57,9 @@ coldCounter
 
 # Data Exploration Tool
 
-This repository includes BeeKeeper Studio Portable.   
+This repository includes a distrobution of BeeKeeper Studio Portable. This project is in no way affiliated with Beekeeper Studio,
+nor is any person presently involved with the development of this project, but they make a very easy to use SQLite browser that does
+not require you to install any additional software locally to your computer to use.   
 
 Run /Beekeper Portable Data Browser/Beekeeper-Studio-5.6.0-portable.exe  
 
@@ -97,6 +99,11 @@ detention_stints
 
 fact_hold_rooms
     - contains aggregate data regarding "hold room" usage
+    - Compares against ICE National Detention Standards for hold room usage. 
+        - “A detainee may not be held in a hold room for more than 12 hours.”
+        U.S. Immigration & Customs Enf’t, National Detention Standards 2025, § 2.5 Hold Rooms in Detention Facilities, at 32 (2025), https://www.ice.gov/doclib/detention-standards/2025/nds2025.pdf
+        - “Unaccompanied minors (under 18 years), persons over the age of 70 years, females with children, and family groups will not be placed in hold rooms, unless they have shown or threatened violent behavior, have criminal convictions involving violence, or have given staff articulable grounds to expect an escape attempt.”
+        U.S. Immigration & Customs Enf’t, National Detention Standards 2025, § 2.5 Hold Rooms in Detention Facilities, at 32 (2025), https://www.ice.gov/doclib/detention-standards/2025/nds2025.pdf
 
 fact_detention_facilities
     - contains aggregate detention information from within the scope of the currently available data by facility
@@ -112,11 +119,17 @@ dim_ncic_offense_codes
 
 # Data Sources
 
-coldCounter aggregates immigration detention data published by The Deportation Project (https://deportationdata.org/).
+coldCounter aggregates immigration detention data published by The Deportation Data Project (https://deportationdata.org/).
 
 The project relies on publicly documented datasets that have been compiled and structured for research and public transparency purposes.
 
-All ingestion reference datasets available through deportationdata.org, and the NCIC offense code classifications found at https://support.interstatecompact.org/hc/en-us/articles/360046201293-What-NCIC-Offense-Codes-are-used-in-ICOTS.
+All ingestion reference datasets available through deportationdata.org, and the NCIC offense code classifications found at https://support.interstatecompact.org/hc/en-us/articles/360046201293-What-NCIC-Offense-Codes-are-used-in-ICOTS.  
+  
+### Resources 
+
+  - deportation data project webinar: https://deportationdata.org/docs/ice.html#webinar
+  - deportation data project FAQ: https://deportationdata.org/docs/ice.html#faq
+  - deporation data project data guide: https://deportationdata.org/guide.html
 
 ---
 
@@ -141,7 +154,7 @@ The entire process can be executed from a single build script.
 Example:
 
 ```
-python setup/build_coldCounter.py
+python *your directory*/setup/build_coldCounter.py
 ```
 
 ---
@@ -153,11 +166,12 @@ coldCounter is designed to allow anyone to rebuild the database from source data
 Steps:
 
 1. Clone the repository  
-2. Download the datasets referenced from deportationdata.org  
-3. Run the ETL build script  
+2. Extract to your desired installation directory  
+3. Run the install_or_refresh_coldCounter.bat batch file
 4. The SQLite database will be generated locally  
 
-This workflow ensures that analytical results can be independently verified.
+This workflow ensures that analytical results can be independently verified, and ensures transparency of data accuracy through consistency.  
+The coldCounter.db included in this repository is up to date as of the most recent commit. The batch file can be run at any time to rebuild the data with the most recently available datasets from the Deportation Data Project.
 
 ---
 

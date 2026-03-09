@@ -143,23 +143,24 @@ All ingestion reference datasets available through deportationdata.org, and the 
 
 # ETL Pipeline
 
-The ETL workflow follows three stages.
+The ETL workflow follows four stages.
 
-### 1. Ingest
+### 1. Ingest  
 
-Raw datasets are downloaded and stored in system memory.
+Raw datasets are downloaded from deportationdata.org and stored in system memory as python dataframes.
 
 ### 2. Normalize
 
-Scripts standardize column names, convert inconsistent formats, and map offense codes to normalized classification tables.
+build_coldCounter.py standardizes column names, convert inconsistent formats, and map offense codes to normalized classification tables.  
 
-### 3. Load
+### 3. Analyze
+build_coldCounter.py calculates aggregate and derived fields based on normalized data to populate fact table dataframes.  
 
-Normalized datasets are inserted into the SQLite data mart.
+### 3. Load  
 
-The entire process can be executed from a single build script.
-
-Example:
+build_coldCounter.py replaces each table in coldCounter.db with each new dataframe   
+The entire process can be executed from a single build script.  
+Example:  
 
 ```
 python *your directory*/setup/build_coldCounter.py

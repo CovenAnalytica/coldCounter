@@ -126,7 +126,7 @@ The ETL workflow follows three stages.
 
 ### 1. Ingest
 
-Raw datasets are downloaded and stored in system memorgy.
+Raw datasets are downloaded and stored in system memory.
 
 ### 2. Normalize
 

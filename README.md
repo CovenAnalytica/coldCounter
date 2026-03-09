@@ -44,23 +44,10 @@ The database structure enables researchers to generate statistical summaries and
 ```
 coldCounter
 │
-├─ etl
-│  ├─ ingest.py
-│  ├─ normalize.py
-│  └─ build_database.py
-│
-├─ schema
-│  ├─ dim_offense.sql
-│  ├─ dim_facility.sql
-│  ├─ dim_person.sql
-│  └─ fact_detention_events.sql
-│
-├─ data
-│  └─ raw_downloads
-│
-├─ reports
-│  └─ example_queries.sql
-│
+├─ Setup
+│  ├─ build script to create or refresh coldCounter.db
+│├─ Beekeeper Portable Data Browser
+│  ├─ data exploration tool
 ├─ coldcounter.db
 │
 └─ README.md
@@ -125,29 +112,7 @@ The entire process can be executed from a single build script.
 Example:
 
 ```
-python etl/build_database.py
-```
-
----
-
-# Example Queries
-
-Total detainees by facility
-
-```
-SELECT facility_name, COUNT(*)
-FROM fact_detention_events
-JOIN dim_facility USING (facility_id)
-GROUP BY facility_name;
-```
-
-Offense classifications represented in detention records
-
-```
-SELECT offense_code, COUNT(*)
-FROM fact_detention_events
-JOIN dim_offense USING (offense_id)
-GROUP BY offense_code;
+python setup/build_coldCounter.py
 ```
 
 ---
@@ -210,3 +175,5 @@ Suggested areas for contribution include:
 - documentation improvements
 
 Pull requests and issue reports are encouraged.
+
+nocampscolorado.org

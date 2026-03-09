@@ -57,14 +57,17 @@ coldCounter
 
 # Data Exploration Tool
 
-This repository includes BeeKeeper Studio Portable. 
+This repository includes BeeKeeper Studio Portable.   
 
-Run /Beekeper Portable Data Browser/Beekeeper-Studio-5.6.0-portable.exe
+Run /Beekeper Portable Data Browser/Beekeeper-Studio-5.6.0-portable.exe  
 
-If prompted enter the following:
-Connection type: SQLite
-Database File: *Choose your coldCounter.db file*
-Save your connection for later use.
+If prompted enter the following:  
+
+Connection type: SQLite  
+
+Database File: *Choose your coldCounter.db file*  
+
+Save your connection for later use.  
 *After running for first time, you can just open the coldCounter.db file directly* 
 
 
@@ -78,23 +81,33 @@ Primary tables include:
 
 ### Raw Tables
 
-arrests
+arrests 
+    - arrest data from the Deportation Data Project
 detainers
+    - data from the Deportation Data Project pertaining to ICE contact with law enforcement.
 detention_stays
+    - individual based reporting of detention data from the Deportation Data Project
 detention_stints
+    - encounter based reporting of detention data from the Deportation Data Project
 
 ### Fact Tables
 
 fact_hold_rooms
+    - contains aggregate data regarding "hold room" usage
 fact_detention_facilities
+    - contains aggregate detention information from within the scope of the currently available data by facility
 
+### Dimension Tables
+
+dim_ncic_offense_codes
+    - contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS (https://support.interstatecompact.org/hc/en-us/articles/360046201293-What-NCIC-Offense-Codes-are-used-in-ICOTS)
 ---
 
 # Data Sources
 
-coldCounter aggregates immigration detention data published by deportationdata.org.
+coldCounter aggregates immigration detention data published by The Deportation Project (https://deportationdata.org/).
 
-The project relies on publicly documented datasets that have been compiled and structured by deportationdata.org for research and public transparency purposes.
+The project relies on publicly documented datasets that have been compiled and structured for research and public transparency purposes.
 
 All ingestion scripts reference datasets available through deportationdata.org.
 

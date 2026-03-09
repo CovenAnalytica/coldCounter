@@ -97,11 +97,11 @@ fact_hold_rooms
 fact_detention_facilities
     - contains aggregate detention information from within the scope of the currently available data by facility
 
+
 ### Dimension Tables
 
-
 dim_ncic_offense_codes
-    -  contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS
+    - contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS
     
  
 ---

@@ -205,4 +205,4 @@ Suggested areas for contribution include:
 
 Pull requests and issue reports are encouraged.
 
-nocampscolorado.org
+https://nocampscolorado.org

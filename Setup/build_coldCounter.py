@@ -460,7 +460,7 @@ def green_banner(text, repeats=4, delay=0.5):
         time.sleep(delay)  
 
 def moneyyyyy():
-    green_banner("") #this is a joke, nerd
+    green_banner("CASHING SOROS CHECK") #this is a joke, nerd
 
 
 # --------------------------------------------------

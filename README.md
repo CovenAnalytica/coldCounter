@@ -99,8 +99,9 @@ fact_detention_facilities
 
 ### Dimension Tables
 
+
 dim_ncic_offense_codes
-    - contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS
+    -  contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS
     
  
 ---

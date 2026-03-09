@@ -97,7 +97,7 @@ detention_stints
 
 fact_hold_rooms
     - contains aggregate data regarding "hold room" usage
-    
+
 fact_detention_facilities
     - contains aggregate detention information from within the scope of the currently available data by facility
 
@@ -197,9 +197,9 @@ Contributions are welcome.
 
 Suggested areas for contribution include:
 
-- additional normalization scripts
+- additional dimension tables
 - improved database schema design
-- analytical query libraries
+- SQLite query libraries
 - data validation tools
 - documentation improvements
 

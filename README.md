@@ -163,7 +163,7 @@ The entire process can be executed from a single build script.
 Example:  
 
 ```
-python *your directory*/setup/build_coldCounter.py
+python *your directory*/Setup/build_coldCounter.py
 ```
 
 ---

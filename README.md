@@ -179,8 +179,12 @@ Steps:
 3. Run the install_or_refresh_coldCounter.bat batch file
 4. The SQLite database will be generated locally  
 
-This workflow ensures that analytical results can be independently verified, and ensures transparency of data accuracy through consistency.  
-The coldCounter.db included in this repository is up to date as of the most recent commit. The batch file can be run at any time to rebuild the data with the most recently available datasets from the Deportation Data Project.
+This workflow ensures that analytical results can be independently verified, and ensures transparency of data accuracy through consistency.   
+```
+The coldCounter.db included in this repository is up to date as of the most recent commit.
+install_or_refresh_coldCounter.bat can be run at any time to rebuild the data with the most
+recently available datasets from the Deportation Data Project.
+```
 
 ---
 

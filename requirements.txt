@@ -3,3 +3,5 @@ requests
 pyfiglet
 colorama
 openpyxl
+beautifulsoup4
+lxml

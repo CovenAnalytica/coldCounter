@@ -40,7 +40,7 @@ REM ==================================================
 REM  Run the Python script
 REM ==================================================
 echo Running build_coldCounter.py...
-cd /d %~dp0\Setup
+cd /d %~dp0\code
 python build_coldCounter.py
 
 REM ==================================================

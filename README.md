@@ -44,7 +44,9 @@ The database structure enables researchers to generate statistical summaries and
 ```
 coldCounter
 │
-├─ Setup
+├─ data
+│  ├─ ice office locations, NOCCC research, and crosswalk maps
+├─ code
 │  ├─ build script to create or refresh coldCounter.db
 │├─ Beekeeper Portable Data Browser
 │  ├─ data exploration tool
@@ -99,6 +101,7 @@ detention_stints
 fact_hold_rooms  
     - contains aggregate data regarding "hold room" usage  
     - Compares against ICE National Detention Standards for hold room usage.  
+    - Updated counts account for June 2025 Trump memorandum extending acceptable usage from 12 to 72 hours   
     
         “A detainee may not be held in a hold room for more than 12 hours.”  
         U.S. Immigration & Customs Enf’t, National Detention Standards 2025,  
@@ -120,7 +123,13 @@ fact_detention_facilities
 ### Dimension Tables
 
 dim_ncic_offense_codes  
-    - contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS
+    - contains categorized NCIC offense codes used in ICOTS, obtained from ICAOS   
+
+dim_ice_offices  
+    - contains location information from ice offices scraped from ICE website  
+  
+dim_noccc_holdroom_research  
+    - contains locations disccovered via research performed by NOCCC with sourcing documents  
     
  
 ---
@@ -132,6 +141,9 @@ coldCounter aggregates immigration detention data published by The Deportation D
 The project relies on publicly documented datasets that have been compiled and structured for research and public transparency purposes.
 
 All ingestion reference datasets available through deportationdata.org, and the NCIC offense code classifications found at https://support.interstatecompact.org/hc/en-us/articles/360046201293-What-NCIC-Offense-Codes-are-used-in-ICOTS.  
+  
+  
+Additional sourcing for holdroom location data available in dom_noccc_holdroom_research.     
   
 ### Resources 
 

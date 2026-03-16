@@ -130,8 +130,10 @@ dim_ice_offices
   
 dim_noccc_holdroom_research  
     - contains locations disccovered via research performed by NOCCC with sourcing documents  
+      
+dim_hold_rooms  
+    - contains locations of hold rooms based of ice office location or other FOIA obtained research.  
     
- 
 ---
 
 # Data Sources

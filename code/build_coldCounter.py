@@ -6,11 +6,12 @@ Unified ETL pipeline for the coldCounter database.
 
 Pipeline Stages
 ----------------
-0. Load NCIC offense code dimension table
-1. Ingest public ICE datasets from the Deportation Data Project
-2. Build hold room statistics fact table
-3. Build facility statistics fact table
-4. Run sanity checks
+0. Load reference tables from local files (e.g. NCIC offense codes)
+1. Ingest public datasets from Deportation Data Project GitHub repositories
+    1B. Apply deterministic UUIDs to scraped ice office locations
+    1C. Load raw tables from public dataset extract
+2. Build fact tables
+3. Build dimension tables
 
 Author: DG - NOCCC
 """
@@ -40,7 +41,7 @@ workspace_root = current_dir.parent
 
 db_path = workspace_root / "coldCounter.db"
 ncic_excel = workspace_root / "data" / "ICOTS_NCIC_OffenseCodesList.xlsx"
-holdroom_research_csv = workspace_root / "data" / "noccc_holdroom_research.csv"
+holdroom_research_csv = workspace_root / "data" / "NOCCC_holdroom_research.csv"
 holdroom_office_mapping_csv = workspace_root / "data" / "holdroom_office_mapping.csv"
 
 
@@ -54,7 +55,7 @@ datasets = [
     {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detention-stints-latest.xlsx", "table": "raw_detention_stints"},
     {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detention-stays-latest.xlsx", "table": "raw_detention_stays"},
     {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/facilities-daily-population-latest.xlsx", "table": "raw_facility_population"},
-    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/ice-offices.xlsx", "table": "dim_ice_offices"}
+    {"url": "https://github.com/deportationdata/ice-offices/raw/refs/heads/main/data/ice-offices.xlsx", "table": "dim_ice_offices"}
 ]
 
 #---------------------------------------------------
@@ -64,7 +65,6 @@ datasets = [
 NAMESPACE_ICE_OFFICES = uuid.UUID("12345678-1234-5678-1234-567812345678")
 NAMESPACE_RESEARCH_HOLDROOMS = uuid.UUID("12345678-1234-5678-1234-567812345678")
 NAMESPACE_HOLD_ROOMS = uuid.UUID("87654321-4321-6789-4321-678943216789")
-
 
 # --------------------------------------------------
 # LOGGING UTILITIES
@@ -84,23 +84,53 @@ def banner(msg):
 def holdroom_uuid(code):
     return str(uuid.uuid5(NAMESPACE_HOLD_ROOMS, str(code).upper()))
 
+def office_uuid(name, city, state):
+    key = f"{name}_{city}_{state}"
+    return str(uuid.uuid5(NAMESPACE_ICE_OFFICES, key))
+
 # --------------------------------------------------
-# STAGE 0 — LOAD NCIC DIMENSION TABLE
+# STAGE 0 — LOAD REFERENCE TABLES
 # --------------------------------------------------
 
-def load_ncic_dimension(conn):
-    banner("STAGE 0 — LOADING NCIC OFFENSE CODE DIMENSION")
+def load_ncic_codes(conn):
+    banner("STAGE 0 - 1 : LOADING NCIC OFFENSE CODE TABLE")
     if not ncic_excel.exists():
         log(f"ERROR: NCIC offense code file not found: {ncic_excel}")
         return
     log(f"Reading offense code list from {ncic_excel.name}")
     df = pd.read_excel(ncic_excel)
     log(f"Offense codes loaded: {len(df)} rows")
-    df.to_sql("dim_ncic_offense_codes", conn, if_exists="replace", index=False)
+    df.to_sql("ref_ncic_offense_codes", conn, if_exists="replace", index=False)
 
-    log("dim_ncic_offense_codes table refreshed")
+    log("ref_ncic_offense_codes table refreshed")
     if "Code" in df.columns:
-        log(f"Unique offense codes available: {df['Code'].nunique()}")
+        log(f"Total offense codes loaded: {df['Code'].nunique()}")
+
+def load_noccc_holdroom_research(conn):
+    banner("STAGE 0 - 2 : LOADING HOLD ROOM RESEARCH TABLE")
+    if not holdroom_research_csv.exists():
+        log(f"ERROR: file not found: {holdroom_research_csv}")
+        return
+    log(f"Reading hold room research from {holdroom_research_csv.name}")
+    df = pd.read_csv(holdroom_research_csv)
+    def make_uuid(row):
+        key = f"{row.get('holdroom_detention_facility_code','')}"
+        return str(uuid.uuid5(NAMESPACE_RESEARCH_HOLDROOMS, key))
+    df.insert(0, "research_id", df.apply(make_uuid, axis=1))
+    log(f"Hold room research loaded: {len(df)} rows")
+    df.to_sql("ref_noccc_holdroom_research", conn, if_exists="replace", index=False)
+    log("ref_noccc_holdroom_research table refreshed")
+
+def load_holdroom_office_mapping(conn):
+    banner("STAGE 0 - 3 : LOADING HOLD ROOM X OFFICE MAPPING TABLE")
+    if not holdroom_office_mapping_csv.exists():
+        log(f"ERROR: file not found: {holdroom_office_mapping_csv}")
+        return
+    log(f"Reading hold room office mapping from {holdroom_office_mapping_csv.name}")
+    df = pd.read_csv(holdroom_office_mapping_csv)
+    log(f"Hold room office mapping loaded: {len(df)} rows")
+    df.to_sql("ref_holdroom_office_xwalk", conn, if_exists="replace", index=False)
+    log("ref_holdroom_office_xwalk table refreshed")
 
 
 # --------------------------------------------------
@@ -143,181 +173,26 @@ def ingest_datasets(conn):
     log("Raw ingestion stage completed")
 
 #--------------------------------------------------
-# STAGE 1B - AUGMENTING HOLD ROOM LOCATIONS WITH ADDITIONAL SOURCES
+# STAGE 2 - BUILD FACT TABLES
 #--------------------------------------------------
-
-def load_holdroom_research(conn):
-
-    banner("STAGE 1B — AUGMENTING HOLD ROOM LOCATIONS WITH ADDITIONAL SOURCES")
-
-    if not holdroom_research_csv.exists():
-        log(f"ERROR: file not found: {holdroom_research_csv}")
-        return
-
-    try:
-        log(f"Reading {holdroom_research_csv.name}")
-
-        df = pd.read_csv(holdroom_research_csv)
-
-        if "holdroom_detention_facility_code" not in df.columns:
-            log("ERROR: holdroom_detention_facility_code column missing")
-            return
-
-        # deterministic namespace
-        NAMESPACE_RESEARCH_HOLDROOMS = uuid.UUID("12345678-1234-5678-1234-567812345678")
-
-        # generate UUID from facility code
-        df["research_id"] = df["holdroom_detention_facility_code"].apply(
-            lambda x: str(uuid.uuid5(NAMESPACE_RESEARCH_HOLDROOMS, str(x)))
-        )
-
-        df["holdroom_id"] = df["holdroom_detention_facility_code"].apply(holdroom_uuid)
-
-        log("Deterministic UUIDs generated from holdroom_detention_facility_code")
-
-        log(f"{len(df):,} rows loaded")
-
-        df.to_sql(
-            "dim_noccc_holdroom_research",
-            conn,
-            if_exists="replace",
-            index=False
-        )
-
-
-        log("dim_noccc_holdroom_research table refreshed")
-
-    except Exception as e:
-        log(f"ERROR loading hold room research: {e}")
-
-#----------------------------------------------------
-# STAGE 1C - LOAD HOLD ROOM OFFICE MAPPING
-#----------------------------------------------------
-
-def load_holdroom_office_mapping(conn):
-
-    banner("STAGE 1C — LOADING HOLD ROOM OFFICE MAPPING")
-
-    if not holdroom_office_mapping_csv.exists():
-        log(f"ERROR: file not found: {holdroom_office_mapping_csv}")
-        return
-
-    try:
-        log(f"Reading {holdroom_office_mapping_csv.name}")
-
-        df = pd.read_csv(holdroom_office_mapping_csv)
-
-        if "holdroom_detention_facility_code" not in df.columns:
-            log("ERROR: holdroom_detention_facility_code column missing")
-            return
-
-        df["holdroom_id"] = df["holdroom_detention_facility_code"].apply(
-            holdroom_uuid
-        )
-
-        log(f"{len(df):,} mappings loaded")
-
-        df.to_sql(
-            "bridge_holdroom_office",
-            conn,
-            if_exists="replace",
-            index=False
-        )
-
-        log("bridge_holdroom_office table refreshed")
-
-    except Exception as e:
-        log(f"ERROR loading holdroom office mapping: {e}")
-
-#---------------------------------------------------
-# STAGE 1D - BUILD HOLD ROOM DIMENSION
-#---------------------------------------------------
-def build_holdroom_dimension(conn):
-
-    banner("STAGE 1C — BUILD HOLD ROOM DIMENSION")
-
-    df = pd.read_sql_query("""
-        SELECT DISTINCT
-            detention_facility_code,
-            detention_facility,
-            state
-        FROM raw_detention_stints
-        WHERE detention_facility_code LIKE '%HOLD'
-    """, conn)
-
-    log(f"{len(df)} hold rooms discovered")
-
-    df["holdroom_id"] = df["detention_facility_code"].apply(holdroom_uuid)
-
-    df.rename(columns={"state":"state_code"}, inplace=True)
-
-    df.to_sql(
-        "dim_hold_rooms_base",
-        conn,
-        if_exists="replace",
-        index=False
-    )
-
-    conn.execute("""
-
-    CREATE TABLE dim_hold_rooms AS
-
-    SELECT DISTINCT
-        hr.*,
-        IFNULL(o.office_name, r.research_name) as holdroom_name,
-        ifnull(o.address, r.address) as holdroom_address,
-        IFNULL(o.city, r.address_city) as holdroom_city,
-        IFNULL(o.state, r.address_state) as holdroom_state,
-        IFNULL(o.zip, r.address_zip) as holdroom_zip,
-        o.office_id,
-        r.research_id
-
-    FROM dim_hold_rooms_base hr
-
-    LEFT JOIN bridge_holdroom_office br
-        ON hr.holdroom_id = br.holdroom_id
-
-    LEFT JOIN dim_noccc_holdroom_research r
-        ON hr.holdroom_id = r.holdroom_id
-
-    LEFT JOIN dim_ice_offices o
-        ON br.office_id = o.office_id
-
-    """)
-
-    log("dim_hold_rooms built and enriched")
-
-# --------------------------------------------------
-# STAGE 2 — BUILD HOLD ROOM FACT TABLE
-# --------------------------------------------------
-
-def build_hold_room_facts(conn):
-
-    banner("STAGE 2 — BUILD HOLD ROOM FACT TABLE")
+def build_stint_fact_table(conn):
+    banner("STAGE 2 - 1 : BUILDING STINT FACT TABLE")
 
     query = """
-    SELECT
-        st.*,
-        cd.*,
-
-        hr.holdroom_id,
-        hr.holdroom_name,
-        hr.holdroom_address,
-        hr.holdroom_city,
-        hr.holdroom_state,
-        hr.holdroom_zip,
-        hr.office_id,
-        hr.research_id,
-        hr.detention_facility_code as holdroom_detention_facility_code,
-        hr.detention_facility as holdroom_detention_facility_name
-
-    FROM raw_detention_stints st
-
-    LEFT JOIN dim_ncic_offense_codes cd
-        ON st.most_serious_conviction_code = cd.Code
-
-    JOIN dim_hold_rooms hr
-        ON st.detention_facility_code = hr.detention_facility_code
+    select
+        st.stint_id,
+        st.stay_ID,
+        st.unique_identifier,
+        st.book_in_date_time,
+        st.book_out_date_time,
+        st.detention_facility_code,
+        st.state,
+        st.bond_posted_date,
+        st.bond_posted_amount,
+        st.detention_release_reason
+    from
+        raw_detention_stints st
+    where not st.likely_duplicate
     """
 
     log("Collecting evidence for the Hague...")
@@ -327,280 +202,138 @@ def build_hold_room_facts(conn):
         parse_dates=["book_in_date_time", "book_out_date_time"]
     )
 
-    log(f"Analyzing: {len(df):,} encounters for Hold Room use...")
-
-    # Ensure facility codes behave properly for string ops
-    df["detention_facility_code"] = df["detention_facility_code"].astype(str)
-
-    filtered = df[
-        (df.likely_duplicate == 0) &
-        (df.book_out_date_time.notna())
-    ].copy()
-
-    log(f"Hold Rooms used: {len(filtered):,} times in dataset.")
-    log("Identifying ICE National Detention Standards violations...")
-    nds_art()
-
-    # ----------------------------
-    # Derived fields
-    # ----------------------------
-
-    filtered["age"] = filtered["book_out_date_time"].dt.year - filtered.birth_year
-
-    filtered["hours_imprisoned"] = (
-        filtered.book_out_date_time - filtered.book_in_date_time
-    ).dt.total_seconds() / 3600.0
-
-    filtered["nights_without_bed"] = (filtered["hours_imprisoned"] >= 12).astype(int)
-
-    filtered["child_prisoner"] = filtered["age"] < 18
-    filtered["is_elderly"] = filtered["age"] >= 70
-
-    filtered["criminality_code"] = filtered["book_in_criminality"].astype(str).str[0]
-
-    filtered["violent_offender"] = (
-        filtered['Type of Offense Code (V=violent, D=drug-related, Blank = nonviolent or not drug related)'] == 'V'
-    )
-
-    filtered["criminal"] = filtered["criminality_code"] == "1"
-    filtered["non_criminal"] = filtered["criminality_code"].isin(["3", "2"])
-    filtered["charges_filed"] = filtered["criminality_code"] == "2"
-    filtered["detained_without_charge"] = filtered["criminality_code"] == "3"
-
-    filtered["violation_hold_over_12_hours"] = (
-        (filtered["hours_imprisoned"] > 12) &
-        (filtered["book_in_date_time"] < pd.Timestamp("2025-06-22"))
-    )
-
-    filtered["violation_held_over_72_hours"] = (
-        filtered["hours_imprisoned"] > 72
-    )
-
-    filtered["violation_nv_elderly_over_70"] = (
-        (filtered["age"] >= 70) &
-        (~filtered["violent_offender"])
-    )
-
-    filtered = filtered.fillna(False)
-
-    # ----------------------------
-    # Aggregation
-    # ----------------------------
-
-    grouped = (
-        filtered
-        .groupby(["holdroom_id"])
-        .agg(
-
-            total_encounters=("stint_ID", "count"),
-            total_unique_individuals=("unique_identifier", "count"),
-
-            violations_hold_over_12_hours=("violation_hold_over_12_hours", "sum"),
-            violations_hold_over_72_hours=("violation_held_over_72_hours", "sum"),
-            violations_hold_nv_elderly_over_70=("violation_nv_elderly_over_70", "sum"),
-
-            nights_without_bed=("nights_without_bed", "sum"),
-            children=("child_prisoner", "sum"),
-            elderly=("is_elderly", "sum"),
-
-            min_hours=("hours_imprisoned", "min"),
-            max_hours=("hours_imprisoned", "max"),
-            average_hours=("hours_imprisoned", "mean"),
-
-            min_age=("age", "min"),
-            max_age=("age", "max"),
-            avg_age=("age","mean"),
-
-            pct_no_charge=("detained_without_charge", "mean"),
-            pct_criminal=("criminal", "mean"),
-            pct_non_criminal=("non_criminal", "mean"),
-            pct_violent_offender=("violent_offender", "mean"),
-
-            min_book_in_date_in_dataset=("book_in_date_time", "min"),
-            max_book_out_date_in_dataset=("book_out_date_time", "max"),
-
-            count_convicted_criminals=("criminal", "sum"),
-            count_charged=("charges_filed", "sum"),
-            count_no_charges=("detained_without_charge", "sum"),
-
-            holdroom_name=("holdroom_name","first"),
-
-            holdroom_address=("holdroom_address","first"),
-            holdroom_city=("holdroom_city","first"),
-            holdroom_state=("holdroom_state","first"),
-            holdroom_zip=("holdroom_zip","first"),
-
-            holdroom_detention_facility_code=("holdroom_detention_facility_code","first"),
-            holdroom_detention_facility_name=("holdroom_detention_facility_name","first"),
-
-            office_id=("office_id","first"),
-            research_id=("research_id","first")
-        )
-        .round(2)
-        .reset_index()
-        .sort_values(["holdroom_state", "holdroom_id"])
-    )
-
-
-    # --------------------------------------------------
-    # Column ordering
-    # --------------------------------------------------
-
-    stat_fields = [
-        "total_encounters",
-        "total_unique_individuals",
-        "violations_hold_over_12_hours",
-        "violations_hold_over_72_hours",
-        "violations_hold_nv_elderly_over_70",
-        "nights_without_bed",
-        "children",
-        "elderly",
-        "min_hours",
-        "max_hours",
-        "average_hours",
-        "min_age",
-        "max_age",
-        "avg_age",
-        "pct_no_charge",
-        "pct_criminal",
-        "pct_non_criminal",
-        "pct_violent_offender",
-        "min_book_in_date_in_dataset",
-        "max_book_out_date_in_dataset",
-        "count_convicted_criminals",
-        "count_charged",
-        "count_no_charges"
-    ]
-
-    address_fields = [
-        "holdroom_address",
-        "holdroom_city",
-        "holdroom_state",
-        "holdroom_zip"
-    ]
-
-    id_fields = [
-        "holdroom_id",
-        "office_id",
-        "research_id"
-    ]
-
-    final_order = (
-        ["holdroom_detention_facility_code", "holdroom_name","holdroom_detention_facility_name"]
-        + stat_fields
-        + address_fields
-        + id_fields
-    )
-
-    grouped = grouped[final_order]
-
-    # --------------------------------------------------
-    # Write final table
-    # --------------------------------------------------
-
-    log("Writing analysis to fact_hold_rooms")
-
-    grouped.to_sql(
-        "fact_hold_rooms",
+    log(f"Loading: {len(df):,} stints into fact_stints...")
+    df.to_sql(
+        "fact_stints",
         conn,
         if_exists="replace",
         index=False
     )
 
-    log(f"fact_hold_rooms written ({len(grouped)} rows)")
+#--------------------------------------------------
+# STAGE 3 - BUILD DIMENSION TABLES
+#--------------------------------------------------
+def build_detention_facility_dimension(conn):
+    banner("STAGE 3 - 1 BUILDING DETENTION FACILITY DIMENSION")
 
-    conn.execute("DROP TABLE IF EXISTS dim_hold_rooms_base")
-    conn.execute("DROP TABLE IF EXISTS bridge_holdroom_office")
-
-# --------------------------------------------------
-# STAGE 3 — BUILD FACILITY STATISTICS FACT TABLE
-# --------------------------------------------------
-
-def build_facility_statistics(conn):
-
-    banner("STAGE 3 — BUILD FACILITY STATISTICS FACT TABLE")
-    log("Loading detention data to memory...")
-    df = pd.read_sql_query(
+    query_base = """
+        select
+            st.detention_facility_code,
+            st.detention_facility detention_facility_name,
+            st.state detention_facility_state,
+            avg(case when st.book_in_criminality like '1%' then 1 else 0 end) pct_non_criminal,
+            count(distinct st.unique_identifier) total_unique_people,
+            count(distinct st.unique_identifier) filter (where CAST(strftime('%Y',st.book_in_date_time) as integer) - st.birth_year < 18) children,
+            count(distinct st.unique_identifier) filter (where CAST(strftime('%Y',st.book_in_date_time) as integer) - st.birth_year > 70) elderly_over_70,
+            avg(julianday(st.book_out_date_time) - julianday(st.book_in_date_time)) average_days,
+            max(julianday(st.book_out_date_time) - julianday(st.book_in_date_time)) max_days,
+            min(st.book_in_date_time) earliest_book_in_time_in_data,
+            max(st.book_out_date_time) latest_book_out_time_in_data,
+            avg(case when st.final_order_yes_no = 'YES' then 1 else 0 end) pct_final_order_given
+        from
+            raw_detention_stints st
+        group by 
+            st.detention_facility_code,
+            st.detention_facility,
+            st.state
+        order by
+            st.state,
+            st.detention_facility_code
         """
-        SELECT * FROM raw_detention_stints st
-        LEFT JOIN dim_ncic_offense_codes cd
-        ON st.most_serious_conviction_code = cd.Code
-        """,
+
+    log("Loading detention facility base information...")
+    df_base = pd.read_sql_query(
+        query_base,
+        conn
+    )
+
+    query_daily_pop = """
+        select
+            fp.detention_facility_code,
+            avg(fp.n_detained) average_daily_population,
+            max(fp.n_detained) max_daily_population
+        from
+            raw_facility_population fp
+        group by fp.detention_facility_code """
+    
+    log("Loading detention facility daily population information...")
+    df_pop = pd.read_sql_query(
+        query_daily_pop,
+        conn
+    )
+    log("Merging base detention facility information with population data...")
+    df = df_base.merge(df_pop, on="detention_facility_code", how="left")
+
+    log(f"{len(df):,} unique detention facility codes encountered")
+    log("Note: some facilities may be local jails or healthcare facilities used for detainee tracking purposes, not official ICE detention centers.")
+    log("Inserting dimensional data into dim_detention_facilities...")
+    df.to_sql(
+        "dim_detention_facilities",
         conn,
-        parse_dates=["book_in_date_time","book_out_date_time"]
-    )
-    log("Filtering duplicates...")
-    filtered = df[
-        (df.likely_duplicate == 0) &
-        (df.book_out_date_time.notna())
-    ].copy()
-    log("Computing derived fields...")
-     # Compute derived fields
-    filtered["age"] = filtered["book_out_date_time"].dt.year - filtered.birth_year
-    filtered["days_imprisoned"] = (
-        filtered.book_out_date_time - filtered.book_in_date_time
-    ).dt.total_seconds() / 86400.0
-    filtered["temp_hold_over_72"] = filtered["days_imprisoned"] >= 3 
-     # add extra demographic/criminal flags
-    filtered["child_prisoner"] = filtered["age"] < 18
-    filtered["is_elderly"] = filtered["age"] >= 70
-     # Extract criminality codes from first character of book_in_criminality
-    filtered["criminality_code"] = filtered["book_in_criminality"].astype(str).str[0]
-    filtered["criminal"] = filtered["criminality_code"] == "1"  # criminal
-    filtered["non_criminal"] = filtered["criminality_code"].isin(["3", "2"]) #no criminal conviction
-    filtered["charged"] = filtered["criminality_code"] == "2"  # pending charges
-    filtered["no_charges"] = filtered["criminality_code"] == "3"  # no criminal charge
-    filtered["violent_offender"] = filtered['Type of Offense Code (V=violent, D=drug-related, Blank = nonviolent or not drug related)'] == 'V'
-
-     # Categorize facility type
-    def categorize_facility(row):
-        code = row['detention_facility_code']
-        name = row['detention_facility']
-        if code.endswith('HOLD'):
-            return 'hold room'
-        elif 'JAIL' in name or 'COR' in name:
-            return 'jail'
-        elif 'HOS' in name:
-            return 'hospital'
-        else:
-            return 'other'
-    filtered['facility_category'] = filtered.apply(categorize_facility, axis=1)
-    filtered = filtered.fillna(False)
-    log("Aggregating data by facility...")
-     # Group by facility and compute aggregate statistics
-    grouped = (
-        filtered
-        .groupby(["state","detention_facility", "detention_facility_code"])
-        .agg(
-            facility_category=('facility_category', 'first'),
-            total_stays_recorded_at_facility=("stay_ID", "count"),
-            min_book_in_date_in_dataset=("book_in_date_time", "min"),
-            max_book_out_date_in_dataset=("book_out_date_time", "max"),
-            min_days=("days_imprisoned", "min"),
-            max_days=("days_imprisoned", "max"),
-            average_days=("days_imprisoned", "mean"),
-            min_age=("age", "min"),
-            max_age=("age", "max"),
-            children=("child_prisoner", "sum"),
-            elderly=("is_elderly", "sum"),
-            pct_non_criminal=("non_criminal", "mean"),
-            pct_violent_offender=("violent_offender", "mean"),
-            avg_bond_posted=("bond_posted_amount", "mean"),
-            count_criminal=("criminal", "sum"),
-            count_charges_pending=("charged", "sum"),
-            count_no_charges=("no_charges", "sum")
-     )
-        .round(2)
-        .reset_index()
-        .sort_values("detention_facility_code")
+        if_exists="replace",
+        index=False
     )
 
-    grouped.rename(columns={"state":"state_code"}, inplace=True)
-    log("Writing analysis to fact_facility_statistics")
-    grouped.to_sql("fact_facility_statistics", conn, if_exists="replace", index=False)
-    log(f"fact_facility_statistics written ({len(grouped)} rows)")
+def build_hold_room_dimension(conn):
+    banner("STAGE 3 - 2 BUILDING HOLD ROOM DIMENSION")
 
-
+    query = """
+    select 
+        st.detention_facility_code,
+        st.detention_facility detention_facility_name,
+        st.state detention_facility_state,
+        count(distinct st.stint_id) total_times_used,
+        count(distinct st.stint_id) filter (where st.book_in_date_time < '2025-01-01') total_times_used_before_2025,
+        count(distinct st.stint_id) filter (where st.book_in_date_time >= '2025-01-01') total_times_used_since_2025,
+        count(distinct st.unique_identifier) total_unique_people,
+        count(distinct st.unique_identifier) filter (where CAST(strftime('%Y',st.book_in_date_time) as integer) - st.birth_year < 18) children,
+        count(distinct st.unique_identifier) filter (where CAST(strftime('%Y',st.book_in_date_time) as integer) - st.birth_year > 70) elderly_over_70,
+        count(distinct st.stint_id) filter (where julianday(st.book_out_date_time) - julianday(st.book_in_date_time) >= 0.5 and st.book_out_date_time < '2025-06-24') violations_over_12_hours_before_waiver,
+        count(distinct st.stint_id) filter (where julianday(st.book_out_date_time) - julianday(st.book_in_date_time) >= 3) violations_over_72_hours,
+        count(distinct st.stint_id) filter (where julianday(st.book_out_date_time) - julianday(st.book_in_date_time) >= 3 and st.book_out_date_time > '2025-06-24') violations_over_72_hours_post_waiver,
+        avg((julianday(st.book_out_date_time) - julianday(st.book_in_date_time)) * 24) average_hours_imprisoned,
+        count(distinct st.stint_id) filter (where julianday(st.book_out_date_time) - julianday(st.book_in_date_time) >= 7) imprisoned_over_7_days,
+        count(distinct st.stint_id) filter (where julianday(st.book_out_date_time) - julianday(st.book_in_date_time) >= 30) imprisoned_over_30_days,
+        coalesce(o.address, r.address) holdroom_address,
+        coalesce(o.city, r.address_city) holdroom_city,
+        coalesce(o.state, r.address_state) holdroom_state,
+        coalesce(o.zip, r.address_zip) holdroom_zip,
+        case
+            when o.office_id is null and r.research_id is not null then 'NOCCC Research'
+            when o.office_id is not null then 'DPP ICE office web scrape'
+            when o.office_id is null and r.research_id is null then 'Research Incomplete'
+        end as source_of_holdroom_location_information,
+        MAX(o.office_id) as office_id,
+        MAX(r.research_id) as research_id
+    from 
+        raw_detention_stints st
+        left join ref_noccc_holdroom_research r
+            on st.detention_facility_code = r.holdroom_detention_facility_code
+        left join ref_holdroom_office_xwalk x
+            on st.detention_facility_code = x.holdroom_detention_facility_code
+        left join dim_ice_offices o
+            on x.office_id = o.office_id
+    where st.detention_facility_code like '%HOLD'
+    group by
+    st.detention_facility_code,
+    st.detention_facility,
+    st.state
+    order by
+    st.state,
+    st.detention_facility_code
+    """
+    log("Collecting evidence for the Hague...")
+    df = pd.read_sql_query(
+        query,
+        conn
+    )
+    log(f"Loading: {len(df):,} hold rooms into dim_hold_rooms...")
+    df.to_sql(
+        "dim_hold_rooms",
+        conn,
+        if_exists="replace",
+        index=False
+    )
 
 # --------------------------------------------------
 # SANITY CHECKS
@@ -615,10 +348,14 @@ def sanity_checks(conn):
         "raw_detainers",
         "raw_detention_stays",
         "raw_detention_stints",
-        "fact_hold_rooms",
-        "fact_facility_statistics",
-        "dim_ncic_offense_codes",
-        "dim_ice_offices"
+        "raw_facility_population",
+        "ref_noccc_holdroom_research",
+        "ref_holdroom_office_xwalk",
+        "ref_ncic_offense_codes",
+        "fact_stints",
+        "dim_detention_facilities",
+        "dim_ice_offices",
+        "dim_hold_rooms"
     ]
 
     for t in tables:
@@ -769,22 +506,20 @@ def moneyyyyy():
 def run_pipeline():
     title_art()
     log("COLDCOUNTER ETL PIPELINE INITIATED")
+    if os.path.exists(db_path):
+        os.remove(db_path)
     conn = sqlite3.connect(db_path)
-    stage_title("S 0")
-    load_ncic_dimension(conn)
-    stage_title("S 1")
-    ingest_datasets(conn)
-    stage_title("S 1-B")
-    load_holdroom_research(conn)
-    stage_title("S 1-C")
+    stage_title("S 0 REF TABLES")
+    load_ncic_codes(conn)
+    load_noccc_holdroom_research(conn)
     load_holdroom_office_mapping(conn)
-    stage_title("S 1-D")
-    build_holdroom_dimension(conn)
-    stage_title("S 2")    
-    build_hold_room_facts(conn)
-    stage_title("S 3")
-    build_facility_statistics(conn)
-    stage_title("S 4")
+    stage_title("S 1 RAW TABLES")
+    ingest_datasets(conn)
+    stage_title("S 2 FACT TABLES")
+    build_stint_fact_table(conn)
+    stage_title("S 3 DIM TABLES")
+    build_detention_facility_dimension(conn)
+    build_hold_room_dimension(conn)
     sanity_checks(conn)
     conn.close()
     banner("DATABASE BUILD COMPLETE")

@@ -5,3 +5,4 @@ colorama
 openpyxl
 beautifulsoup4
 lxml
+pyarrow

@@ -352,6 +352,46 @@ def build_hold_room_dimension(conn):
         index=False
     )
 
+def build_hold_room_facts(conn):
+    banner("STAGE 3 - 2 BUILDING HOLD ROOM FACTS")
+
+    query = """
+    select
+        st.state,
+        st.detention_facility_code,
+        st.book_in_date_time as "BOOK_IN",
+        date(st.book_in_date_time) as "BOOK_DATE",
+        strftime('%Y', st.book_in_date_time) as "BOOK_YEAR",
+        st.book_out_date_time as "BOOK_OUT",
+        julianday(st.book_out_date_time) - julianday(st.book_in_date_time) as "STAY_DAYS",
+        (julianday(st.book_out_date_time) - julianday(st.book_in_date_time)) * 24 as "STAY_HRS",
+        (strftime('%Y', st.book_in_date_time) - st.birth_year) as "BOOK_AGE",
+        st.gender,
+        st.birth_country,
+        st.citizenship_country
+    from
+        raw_detention_stints st
+    where
+        not st.likely_duplicate and st.detention_facility_code like '%HOLD'
+    order by
+        st.state,
+        st.detention_facility_code
+    """
+
+    log("Asking IT for help...")
+    df = pd.read_sql_query(
+        query,
+        conn
+    )
+    log(f"Loading: {len(df):,} detentions into fact_hold_rooms...")
+    df.to_sql(
+        "fact_hold_room_detentions",
+        conn,
+        if_exists="replace",
+        index=False
+    )    
+
+
 # --------------------------------------------------
 # SANITY CHECKS
 # --------------------------------------------------

@@ -22,7 +22,8 @@ import pandas as pd
 import requests
 from io import BytesIO
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import urlparse
 import os
 from pyfiglet import Figlet
 from colorama import Fore, Style, init
@@ -50,12 +51,12 @@ holdroom_office_mapping_csv = workspace_root / "data" / "holdroom_office_mapping
 # --------------------------------------------------
 
 datasets = [
-    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/arrests-latest.xlsx", "table": "raw_arrests"},
-    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detainers-latest.xlsx", "table": "raw_detainers"},
-    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detention-stints-latest.xlsx", "table": "raw_detention_stints"},
-    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detention-stays-latest.xlsx", "table": "raw_detention_stays"},
-    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/facilities-daily-population-latest.xlsx", "table": "raw_facility_population"},
-    {"url": "https://github.com/deportationdata/ice-offices/raw/refs/heads/main/data/ice-offices.xlsx", "table": "dim_ice_offices"}
+    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/arrests-latest.parquet", "table": "raw_arrests"},
+    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detainers-latest.parquet", "table": "raw_detainers"},
+    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detention-stints-latest.parquet", "table": "raw_detention_stints"},
+    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/detention-stays-latest.parquet", "table": "raw_detention_stays"},
+    {"url": "https://github.com/deportationdata/ice/raw/refs/heads/main/data/facilities-daily-population-latest.parquet", "table": "raw_facility_population"},
+    {"url": "https://github.com/deportationdata/ice-offices/raw/refs/heads/main/data/ice-offices.parquet", "table": "dim_ice_offices"}
 ]
 
 #---------------------------------------------------
@@ -81,12 +82,10 @@ def banner(msg):
 #---------------------------------------------------
 # HELPER FUNCTIONS
 #---------------------------------------------------
-def holdroom_uuid(code):
-    return str(uuid.uuid5(NAMESPACE_HOLD_ROOMS, str(code).upper()))
-
-def office_uuid(name, city, state):
-    key = f"{name}_{city}_{state}"
-    return str(uuid.uuid5(NAMESPACE_ICE_OFFICES, key))
+def add_deterministic_uuid(df, table_name, key_columns, id_column, namespace):
+    keys = df[key_columns].fillna("").astype(str).agg("_".join, axis=1)
+    df.insert(0, id_column, keys.map(lambda k: str(uuid.uuid5(namespace, k))))
+    log(f"{table_name}: Deterministic UUIDs generated as {id_column}")
 
 # --------------------------------------------------
 # STAGE 0 — LOAD REFERENCE TABLES
@@ -145,27 +144,43 @@ def ingest_datasets(conn):
 
         url = dataset["url"]
         table_name = dataset["table"]
+        file_type = PurePosixPath(urlparse(url).path).suffix.lower().lstrip(".")
 
         try:
-            log(f"Fetching {table_name} dataset...")
-
+            log(f"{table_name}: Fetching dataset...")
             r = requests.get(url)
             r.raise_for_status()
-
-            log(f"Download successful ({len(r.content):,} bytes)")
-            log("Loading dataframe into memory...")
-            df = pd.read_excel(BytesIO(r.content))
+            log(f"{table_name}: Download successful ({len(r.content):,} bytes)")
+            
+            log(f"{table_name}: Loading {file_type} into dataframe...")
+            if file_type == "parquet":
+                df = pd.read_parquet(BytesIO(r.content))
+            elif file_type == "feather":
+                df = pd.read_feather(BytesIO(r.content))
+            elif file_type == "xlsx":
+                sheet_map = pd.read_excel(BytesIO(r.content), sheet_name=None)
+                frames = []
+                for sheet_name, frame in sheet_map.items():
+                    frames.append(frame)
+                if not frames:
+                    raise ValueError("Workbook contained no sheets with data")
+                df = pd.concat(frames, ignore_index=True)
+            else:
+                raise ValueError(f"Unsupported file type: {file_type}")
+            log(f"{table_name}: Loaded {len(df):,} rows")
+                
             if table_name == "dim_ice_offices":
-                def make_uuid(row):
-                    key = f"{row.get('office_name','')}_{row.get('city','')}_{row.get('state','')}"
-                    return str(uuid.uuid5(NAMESPACE_ICE_OFFICES, key))
-                df.insert(0, "office_id", df.apply(make_uuid, axis=1))
-                log("Deterministic UUIDs generated for dim_ice_offices")
-            log(f"{table_name}: {len(df):,} rows loaded")
-            log("Writing data to coldCounter...")
+                add_deterministic_uuid(
+                    df,
+                    table_name,
+                    key_columns=["office_name", "city", "state"],
+                    id_column="office_id",
+                    namespace=NAMESPACE_ICE_OFFICES,
+                )
+            
+            log(f"{table_name}: Writing to coldCounter...")
             df.to_sql(table_name, conn, if_exists="replace", index=False)
-
-            log(f"Table '{table_name}' updated")
+            log(f"{table_name}: Table updated")
 
         except Exception as e:
             log(f"ERROR loading {table_name}: {e}")

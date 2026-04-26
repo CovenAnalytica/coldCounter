@@ -577,6 +577,7 @@ def run_pipeline():
     stage_title("S 3 DIM TABLES")
     build_detention_facility_dimension(conn)
     build_hold_room_dimension(conn)
+    build_hold_room_facts(conn)
     sanity_checks(conn)
     conn.close()
     banner("DATABASE BUILD COMPLETE")

@@ -1,0 +1,10 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment": true,
+    "python.venvPath": "${workspaceFolder}",
+    "terminal.integrated.env.windows": {
+        "PATH": "${workspaceFolder}\\.venv\\Scripts;${env:PATH}"
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
+    "python-envs.defaultPackageManager": "ms-python.python:pip"
+}
